@@ -6,7 +6,7 @@ export type UserRole = 'admin' | 'staff' | 'customer';
 
 export type MembershipTier = 'none' | 'bronze' | 'silver' | 'gold';
 
-export type PaymentMethod = 'cash' | 'card' | 'upi' | 'wallet';
+export type PaymentMethod = 'cash' | 'card' | 'upi' | 'wallet' | 'paytm' | 'gpay' | 'phonepe';
 
 export type SessionStatus = 'active' | 'paused' | 'completed' | 'expired';
 
@@ -152,6 +152,316 @@ export interface Notification {
   actionUrl?: string;
 }
 
+// ============ NEW FEATURES ============
+
+// Reservation System
+export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
+
+export interface Reservation {
+  id: string;
+  userId: string;
+  userName: string;
+  clientId: string;
+  startTime: string;
+  duration: number; // minutes
+  status: ReservationStatus;
+  createdAt: string;
+  confirmedAt?: string;
+  cancelledAt?: string;
+  notes?: string;
+  notificationSent: boolean;
+}
+
+// Queue Management
+export type QueueStatus = 'waiting' | 'notified' | 'expired' | 'served';
+
+export interface QueueEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  phone?: string;
+  joinedAt: string;
+  estimatedWaitTime: number; // minutes
+  status: QueueStatus;
+  position: number;
+  notifiedAt?: string;
+  expiresAt?: string;
+}
+
+// Food & Beverage POS
+export type FoodCategory = 'snacks' | 'drinks' | 'meals' | 'desserts';
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  category: FoodCategory;
+  price: number;
+  description?: string;
+  imageUrl?: string;
+  isAvailable: boolean;
+  stockQuantity?: number;
+}
+
+export interface FoodOrder {
+  id: string;
+  userId: string;
+  userName: string;
+  clientId?: string;
+  items: {
+    foodItemId: string;
+    foodItemName: string;
+    quantity: number;
+    price: number;
+  }[];
+  totalAmount: number;
+  status: OrderStatus;
+  orderTime: string;
+  deliveryTime?: string;
+  paymentMethod: PaymentMethod;
+  notes?: string;
+}
+
+// Promotional Codes
+export type PromoType = 'percentage' | 'fixed' | 'free_time';
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  name: string;
+  type: PromoType;
+  value: number; // percentage or amount or minutes
+  minPurchase?: number;
+  maxDiscount?: number;
+  validFrom: string;
+  validTo: string;
+  usageLimit?: number;
+  usageCount: number;
+  isActive: boolean;
+  applicableToMembership?: MembershipTier[];
+}
+
+export interface PromoUsage {
+  id: string;
+  promoCodeId: string;
+  userId: string;
+  sessionId?: string;
+  discountAmount: number;
+  usedAt: string;
+}
+
+// Tournament System
+export type TournamentStatus = 'upcoming' | 'registration' | 'ongoing' | 'completed' | 'cancelled';
+export type TournamentFormat = 'single_elimination' | 'double_elimination' | 'round_robin' | 'free_for_all';
+
+export interface Tournament {
+  id: string;
+  name: string;
+  game: string;
+  format: TournamentFormat;
+  status: TournamentStatus;
+  startTime: string;
+  endTime?: string;
+  maxParticipants: number;
+  entryFee: number;
+  prizePool: number;
+  prizes: {
+    position: number;
+    amount: number;
+  }[];
+  participants: string[]; // user IDs
+  matches: TournamentMatch[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface TournamentMatch {
+  id: string;
+  tournamentId: string;
+  round: number;
+  matchNumber: number;
+  player1Id: string;
+  player2Id: string;
+  player1Score?: number;
+  player2Score?: number;
+  winnerId?: string;
+  clientId?: string;
+  startTime?: string;
+  endTime?: string;
+  status: 'scheduled' | 'ongoing' | 'completed';
+}
+
+export interface Leaderboard {
+  userId: string;
+  userName: string;
+  tournamentsWon: number;
+  tournamentsPlayed: number;
+  totalWinnings: number;
+  rank: number;
+}
+
+// Game Library Management
+export type GameCategory = 'fps' | 'moba' | 'rpg' | 'sports' | 'racing' | 'strategy' | 'casual';
+
+export interface Game {
+  id: string;
+  name: string;
+  category: GameCategory;
+  publisher?: string;
+  releaseYear?: number;
+  size: number; // GB
+  minSpecs?: {
+    cpu: string;
+    gpu: string;
+    ram: string;
+    storage: string;
+  };
+  imageUrl?: string;
+  isPopular: boolean;
+  playCount: number;
+}
+
+export interface GameInstallation {
+  gameId: string;
+  clientId: string;
+  installedAt: string;
+  version?: string;
+  lastPlayed?: string;
+}
+
+// Network Monitoring
+export interface NetworkStats {
+  clientId: string;
+  timestamp: string;
+  downloadSpeed: number; // Mbps
+  uploadSpeed: number; // Mbps
+  ping: number; // ms
+  packetLoss: number; // percentage
+  totalDownload: number; // GB
+  totalUpload: number; // GB
+}
+
+// Customer Profile & History
+export interface CustomerProfile {
+  userId: string;
+  totalSessions: number;
+  totalHoursPlayed: number;
+  totalSpent: number;
+  averageSessionDuration: number;
+  favoriteGames: string[];
+  preferredPCs: string[];
+  lastVisit: string;
+  memberSince: string;
+  loyaltyPoints: number;
+  referralCode: string;
+  referredBy?: string;
+}
+
+// Advanced Analytics
+export interface AnalyticsData {
+  date: string;
+  revenue: number;
+  sessions: number;
+  uniqueCustomers: number;
+  averageSessionDuration: number;
+  peakHour: string;
+  mostPlayedGame: string;
+  occupancyRate: number;
+}
+
+export interface RevenueReport {
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  startDate: string;
+  endDate: string;
+  totalRevenue: number;
+  gamingRevenue: number;
+  foodRevenue: number;
+  membershipRevenue: number;
+  breakdown: {
+    date: string;
+    revenue: number;
+  }[];
+}
+
+// Remote PC Control
+export type RemoteCommand = 'lock' | 'unlock' | 'restart' | 'shutdown' | 'screenshot' | 'message';
+
+export interface RemoteControlAction {
+  id: string;
+  clientId: string;
+  command: RemoteCommand;
+  executedBy: string;
+  executedAt: string;
+  status: 'pending' | 'executed' | 'failed';
+  payload?: any;
+  result?: string;
+}
+
+// Backup System
+export interface BackupRecord {
+  id: string;
+  filename: string;
+  createdAt: string;
+  size: number; // bytes
+  type: 'automatic' | 'manual';
+  createdBy?: string;
+  description?: string;
+}
+
+// Notification System
+export type NotificationType = 'email' | 'sms' | 'push' | 'in-app';
+
+export interface NotificationTemplate {
+  id: string;
+  name: string;
+  type: NotificationType;
+  subject: string;
+  body: string;
+  variables: string[]; // e.g., ['userName', 'duration', 'amount']
+}
+
+export interface SentNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  subject: string;
+  body: string;
+  sentAt: string;
+  status: 'sent' | 'failed' | 'pending';
+  readAt?: string;
+}
+
+// Multi-location Support
+export interface Location {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  managerUserId: string;
+  numberOfPCs: number;
+  isActive: boolean;
+  openingHours: {
+    [key: string]: { open: string; close: string; };
+  };
+}
+
+// Enhanced User with more features
+export interface EnhancedUser extends User {
+  profile?: CustomerProfile;
+  permissions?: string[];
+  notificationPreferences?: {
+    email: boolean;
+    sms: boolean;
+    push: boolean;
+  };
+  twoFactorEnabled?: boolean;
+  profilePictureUrl?: string;
+  dateOfBirth?: string;
+  address?: string;
+  emergencyContact?: string;
+}
+
 // Database interface for storage operations
 export interface GamingParlourDatabase {
   users: User[];
@@ -161,4 +471,19 @@ export interface GamingParlourDatabase {
   activityLogs: ActivityLog[];
   pricingRules: PricingRule[];
   config: SystemConfig;
+  // New features
+  reservations: Reservation[];
+  queueEntries: QueueEntry[];
+  foodItems: FoodItem[];
+  foodOrders: FoodOrder[];
+  promoCodes: PromoCode[];
+  promoUsages: PromoUsage[];
+  tournaments: Tournament[];
+  games: Game[];
+  gameInstallations: GameInstallation[];
+  networkStats: NetworkStats[];
+  customerProfiles: CustomerProfile[];
+  remoteActions: RemoteControlAction[];
+  backups: BackupRecord[];
+  sentNotifications: SentNotification[];
 }
