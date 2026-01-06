@@ -1,12 +1,15 @@
 {
-  "name": "fit-check",
+  "name": "gaming-parlour-management",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Complete gaming parlour management system with master-client architecture",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "master": "vite --port 5173",
+    "client": "vite --port 5174"
   },
   "dependencies": {
     "react": "^19.1.0",

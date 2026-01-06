@@ -1,0 +1,215 @@
+/**
+ * Client PC Login Screen
+ * User authentication and session purchase
+ */
+
+import React, { useState, useEffect } from 'react';
+import { PricingRule } from '../../gaming-types';
+import { db } from '../../services/databaseService';
+import { authService } from '../../services/authService';
+
+interface Props {
+  clientId: string;
+  onLoginSuccess: (userId: string, userName: string, durationMinutes: number, amount: number) => void;
+}
+
+const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<PricingRule | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<'login' | 'pricing'>('login');
+
+  useEffect(() => {
+    loadPricingRules();
+  }, []);
+
+  const loadPricingRules = async () => {
+    const rules = await db.getAllPricingRules();
+    setPricingRules(rules.filter(r => r.isActive));
+    if (rules.length > 0) {
+      setSelectedPlan(rules[1]); // Default to 1 hour
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const session = await authService.login(username, password);
+
+      if (session.user.role !== 'customer' && session.user.role !== 'admin') {
+        throw new Error('Only customers can use client PCs');
+      }
+
+      setStep('pricing');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartSession = async () => {
+    if (!selectedPlan) {
+      setError('Please select a time plan');
+      return;
+    }
+
+    const session = authService.getCurrentSession();
+    if (!session) {
+      setError('Session expired, please login again');
+      setStep('login');
+      return;
+    }
+
+    // Check wallet balance
+    const user = session.user;
+    if (user.walletBalance < selectedPlan.price) {
+      setError(`Insufficient balance. You have ₹${user.walletBalance}, but need ₹${selectedPlan.price}`);
+      return;
+    }
+
+    // Deduct from wallet
+    user.walletBalance -= selectedPlan.price;
+    await db.updateUser(user);
+
+    onLoginSuccess(
+      user.id,
+      user.fullName,
+      selectedPlan.duration,
+      selectedPlan.price
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-block p-4 bg-white/10 rounded-full mb-4">
+            <div className="text-6xl">🎮</div>
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-2">Gaming Parlour</h1>
+          <p className="text-xl text-blue-200">{clientId}</p>
+        </div>
+
+        {/* Login Form */}
+        {step === 'login' && (
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
+            <h2 className="text-2xl font-bold text-white mb-6">Welcome Back!</h2>
+
+            {error && (
+              <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 bg-black/30 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter your username"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-200 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-black/30 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-semibold rounded-lg transition transform active:scale-95"
+              >
+                {loading ? 'Logging in...' : 'Login'}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-6 border-t border-white/10">
+              <p className="text-sm text-gray-300 text-center">
+                Demo users: <span className="font-mono text-blue-300">demo1</span> /
+                <span className="font-mono text-blue-300">demo2</span> (password: demo123)
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Pricing Selection */}
+        {step === 'pricing' && (
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
+            <h2 className="text-2xl font-bold text-white mb-6">Select Your Gaming Time</h2>
+
+            {error && (
+              <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {pricingRules.map(rule => (
+                <div
+                  key={rule.id}
+                  onClick={() => setSelectedPlan(rule)}
+                  className={`p-6 rounded-xl cursor-pointer transition border-2 ${
+                    selectedPlan?.id === rule.id
+                      ? 'bg-blue-600 border-blue-400'
+                      : 'bg-black/30 border-white/10 hover:border-white/30'
+                  }`}
+                >
+                  <h3 className="text-xl font-bold text-white mb-2">{rule.name}</h3>
+                  <p className="text-3xl font-bold text-white mb-1">₹{rule.price}</p>
+                  <p className="text-sm text-gray-300">{rule.duration} minutes</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep('login')}
+                className="flex-1 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleStartSession}
+                disabled={!selectedPlan}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold rounded-lg transition transform active:scale-95"
+              >
+                Start Gaming
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-300 text-center mt-4">
+              Wallet Balance: ₹{authService.getCurrentSession()?.user.walletBalance || 0}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ClientLogin;
