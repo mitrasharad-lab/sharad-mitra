@@ -12,7 +12,7 @@ import { oauthService } from '../../services/oauthService';
 interface Props {
   clientId: string;
   onLoginSuccess: (userId: string, userName: string, durationMinutes: number, amount: number) => void;
-  onOAuthLoginSuccess?: (oauthSession: OAuthSession, durationMinutes: number, amount: number) => void;
+  onOAuthLoginSuccess?: (oauthSession: OAuthSession) => void;
 }
 
 const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess, onOAuthLoginSuccess }) => {
@@ -22,8 +22,7 @@ const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess, onOAuthLoginSu
   const [selectedPlan, setSelectedPlan] = useState<PricingRule | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'login' | 'pricing' | 'oauth_pricing'>('login');
-  const [oauthSession, setOAuthSession] = useState<OAuthSession | null>(null);
+  const [step, setStep] = useState<'login' | 'pricing'>('login');
 
   useEffect(() => {
     loadPricingRules();
@@ -31,9 +30,12 @@ const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess, onOAuthLoginSu
     // Listen for OAuth success event
     const handleOAuthSuccess = (e: any) => {
       const session: OAuthSession = e.detail.session;
-      setOAuthSession(session);
-      setStep('oauth_pricing');
       setLoading(false);
+
+      // Immediately notify parent - Master PC will handle pricing
+      if (onOAuthLoginSuccess) {
+        onOAuthLoginSuccess(session);
+      }
     };
 
     window.addEventListener('oauth_success', handleOAuthSuccess);
@@ -41,7 +43,7 @@ const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess, onOAuthLoginSu
     return () => {
       window.removeEventListener('oauth_success', handleOAuthSuccess);
     };
-  }, []);
+  }, [onOAuthLoginSuccess]);
 
   const loadPricingRules = async () => {
     const rules = await db.getAllPricingRules();
@@ -112,19 +114,6 @@ const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess, onOAuthLoginSu
     } catch (err: any) {
       setError(err.message || 'Gmail login failed');
       setLoading(false);
-    }
-  };
-
-  const handleOAuthStartSession = async () => {
-    if (!selectedPlan || !oauthSession) {
-      setError('Please select a time plan');
-      return;
-    }
-
-    if (onOAuthLoginSuccess) {
-      onOAuthLoginSuccess(oauthSession, selectedPlan.duration, selectedPlan.price);
-    } else {
-      setError('OAuth login not supported in this mode');
     }
   };
 
@@ -263,74 +252,6 @@ const ClientLogin: React.FC<Props> = ({ clientId, onLoginSuccess, onOAuthLoginSu
 
             <p className="text-sm text-gray-300 text-center mt-4">
               Wallet Balance: ₹{authService.getCurrentSession()?.user.walletBalance || 0}
-            </p>
-          </div>
-        )}
-
-        {/* OAuth Pricing Selection */}
-        {step === 'oauth_pricing' && oauthSession && (
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
-            <div className="flex items-center gap-4 mb-6">
-              {oauthSession.googlePicture && (
-                <img
-                  src={oauthSession.googlePicture}
-                  alt={oauthSession.googleName}
-                  className="w-16 h-16 rounded-full border-2 border-white/30"
-                />
-              )}
-              <div>
-                <h2 className="text-2xl font-bold text-white">{oauthSession.googleName}</h2>
-                <p className="text-sm text-gray-300">{oauthSession.googleEmail}</p>
-              </div>
-            </div>
-
-            <h3 className="text-xl font-bold text-white mb-4">Select Your Gaming Time</h3>
-
-            {error && (
-              <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-3 rounded-lg mb-4">
-                {error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {pricingRules.map(rule => (
-                <div
-                  key={rule.id}
-                  onClick={() => setSelectedPlan(rule)}
-                  className={`p-6 rounded-xl cursor-pointer transition border-2 ${
-                    selectedPlan?.id === rule.id
-                      ? 'bg-blue-600 border-blue-400'
-                      : 'bg-black/30 border-white/10 hover:border-white/30'
-                  }`}
-                >
-                  <h3 className="text-xl font-bold text-white mb-2">{rule.name}</h3>
-                  <p className="text-3xl font-bold text-white mb-1">₹{rule.price}</p>
-                  <p className="text-sm text-gray-300">{rule.duration} minutes</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setStep('login');
-                  setOAuthSession(null);
-                }}
-                className="flex-1 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleOAuthStartSession}
-                disabled={!selectedPlan}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold rounded-lg transition transform active:scale-95"
-              >
-                Start Gaming
-              </button>
-            </div>
-
-            <p className="text-sm text-gray-300 text-center mt-4">
-              🎮 After payment, you'll access your game library
             </p>
           </div>
         )}

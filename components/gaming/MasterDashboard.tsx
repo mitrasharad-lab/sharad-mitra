@@ -8,6 +8,7 @@ import { ClientPC, Session, DashboardStats, User, Payment } from '../../gaming-t
 import { db } from '../../services/databaseService';
 import { sessionService } from '../../services/sessionService';
 import CommunicationService from '../../services/communicationService';
+import PendingOAuthRequests from './PendingOAuthRequests';
 
 interface Props {
   communication: CommunicationService;
@@ -150,6 +151,9 @@ const MasterDashboard: React.FC<Props> = ({ communication, onLogout }) => {
               <StatCard title="Active Sessions" value={stats.activeSessions.toString()} />
               <StatCard title="Available PCs" value={`${stats.availablePCs} / ${stats.availablePCs + stats.occupiedPCs}`} />
             </div>
+
+            {/* Pending OAuth Requests */}
+            <PendingOAuthRequests communication={communication} />
 
             {/* Client Status Grid */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">

@@ -8,6 +8,7 @@ import LoginSelector from './components/gaming/LoginSelector';
 import MasterDashboard from './components/gaming/MasterDashboard';
 import ClientLogin from './components/gaming/ClientLogin';
 import ClientSession from './components/gaming/ClientSession';
+import WaitingForApproval from './components/gaming/WaitingForApproval';
 import { Session, Payment, OAuthSession } from './gaming-types';
 import { sessionService } from './services/sessionService';
 import { authService } from './services/authService';
@@ -15,7 +16,7 @@ import CommunicationService from './services/communicationService';
 import { initializeSystem } from './services/initService';
 
 type AppMode = 'selection' | 'master' | 'client';
-type ClientState = 'login' | 'session';
+type ClientState = 'login' | 'waiting_approval' | 'session';
 
 const GamingParlourApp: React.FC = () => {
   const [mode, setMode] = useState<AppMode>('selection');
@@ -40,6 +41,25 @@ const GamingParlourApp: React.FC = () => {
 
     init();
   }, []);
+
+  useEffect(() => {
+    if (!communication || mode !== 'client') return;
+
+    // Listen for session approval from Master PC
+    const handleSessionApproval = (message: any) => {
+      if (message.clientId === clientId && message.type === 'session_approved') {
+        const { session } = message.payload;
+        setCurrentSession(session);
+        setClientState('session');
+      }
+    };
+
+    communication.on('session_approved', handleSessionApproval);
+
+    return () => {
+      communication.off('session_approved', handleSessionApproval);
+    };
+  }, [communication, mode, clientId]);
 
   const handleMasterLogin = () => {
     const comm = new CommunicationService('MASTER', 'local');
@@ -99,57 +119,39 @@ const GamingParlourApp: React.FC = () => {
     setClientState('session');
   };
 
-  const handleOAuthLoginSuccess = async (
-    oauthSessionData: OAuthSession,
-    durationMinutes: number,
-    amount: number
-  ) => {
+  const handleOAuthLoginSuccess = async (oauthSessionData: OAuthSession) => {
     // Store OAuth session
     setOAuthSession(oauthSessionData);
 
-    // Create a virtual user ID for OAuth session
-    const userId = `oauth_${oauthSessionData.googleUserId}`;
-    const userName = oauthSessionData.googleName;
-
-    // Create payment record
-    const payment: Payment = {
-      id: `payment-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      sessionId: '', // Will be updated after session creation
-      userId,
-      userName,
-      clientId,
-      amount,
-      method: 'wallet', // In production, integrate with actual payment gateway
-      timestamp: new Date().toISOString(),
-      duration: durationMinutes,
-      description: `OAuth gaming session - ${durationMinutes} minutes`,
-    };
-
-    // Start session
-    const session = await sessionService.startSession(
-      userId,
-      userName,
-      clientId,
-      durationMinutes,
-      payment
-    );
-
-    // Notify master PC about OAuth login
+    // Send OAuth login request to Master PC
     communication?.send({
-      type: 'session_start',
+      type: 'oauth_login_request',
       clientId,
-      userId,
+      userId: `oauth_${oauthSessionData.googleUserId}`,
       payload: {
-        session,
-        oauthLogin: true,
+        oauthSession: oauthSessionData,
         googleEmail: oauthSessionData.googleEmail,
         googleName: oauthSessionData.googleName,
+        googlePicture: oauthSessionData.googlePicture,
       },
       timestamp: new Date().toISOString(),
     });
 
-    setCurrentSession(session);
-    setClientState('session');
+    // Show waiting screen
+    setClientState('waiting_approval');
+  };
+
+  const handleCancelWaiting = () => {
+    // Cancel the request and return to login
+    setOAuthSession(null);
+    setClientState('login');
+
+    // Notify master PC
+    communication?.send({
+      type: 'oauth_login_cancelled',
+      clientId,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const handleSessionEnd = () => {
@@ -206,6 +208,14 @@ const GamingParlourApp: React.FC = () => {
               clientId={clientId}
               onLoginSuccess={handleClientLoginSuccess}
               onOAuthLoginSuccess={handleOAuthLoginSuccess}
+            />
+          )}
+
+          {clientState === 'waiting_approval' && oauthSession && (
+            <WaitingForApproval
+              clientId={clientId}
+              oauthSession={oauthSession}
+              onCancel={handleCancelWaiting}
             />
           )}
 
