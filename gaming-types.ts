@@ -462,6 +462,66 @@ export interface EnhancedUser extends User {
   emergencyContact?: string;
 }
 
+// ============ GOOGLE OAUTH AUTHENTICATION ============
+
+export interface GoogleOAuthToken {
+  accessToken: string;
+  refreshToken?: string;
+  idToken: string;
+  expiresAt: string;
+  tokenType: string;
+}
+
+export interface GoogleUserInfo {
+  id: string;
+  email: string;
+  verifiedEmail: boolean;
+  name: string;
+  givenName: string;
+  familyName: string;
+  picture: string;
+  locale: string;
+}
+
+export interface OAuthSession {
+  id: string;
+  userId: string;
+  googleUserId: string;
+  googleEmail: string;
+  googleName: string;
+  googlePicture: string;
+  token: GoogleOAuthToken;
+  clientId: string;
+  createdAt: string;
+  lastRefreshAt?: string;
+}
+
+// ============ GAME LAUNCH SYSTEM ============
+
+export type GameLaunchStatus = 'launching' | 'running' | 'paused' | 'stopped' | 'crashed';
+
+export interface LaunchedGame {
+  id: string;
+  gameId: string;
+  gameName: string;
+  sessionId: string;
+  userId: string;
+  clientId: string;
+  status: GameLaunchStatus;
+  launchedAt: string;
+  stoppedAt?: string;
+  playtimeMinutes: number;
+  lastHeartbeat?: string;
+}
+
+export interface GameLaunchEvent {
+  id: string;
+  launchedGameId: string;
+  eventType: 'launch' | 'pause' | 'resume' | 'stop' | 'crash' | 'heartbeat';
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
 // Database interface for storage operations
 export interface GamingParlourDatabase {
   users: User[];
@@ -486,4 +546,8 @@ export interface GamingParlourDatabase {
   remoteActions: RemoteControlAction[];
   backups: BackupRecord[];
   sentNotifications: SentNotification[];
+  // OAuth & Game Launch
+  oauthSessions: OAuthSession[];
+  launchedGames: LaunchedGame[];
+  gameLaunchEvents: GameLaunchEvent[];
 }

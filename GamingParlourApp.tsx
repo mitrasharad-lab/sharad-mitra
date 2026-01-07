@@ -8,7 +8,7 @@ import LoginSelector from './components/gaming/LoginSelector';
 import MasterDashboard from './components/gaming/MasterDashboard';
 import ClientLogin from './components/gaming/ClientLogin';
 import ClientSession from './components/gaming/ClientSession';
-import { Session, Payment } from './gaming-types';
+import { Session, Payment, OAuthSession } from './gaming-types';
 import { sessionService } from './services/sessionService';
 import { authService } from './services/authService';
 import CommunicationService from './services/communicationService';
@@ -22,6 +22,7 @@ const GamingParlourApp: React.FC = () => {
   const [clientId, setClientId] = useState<string>('');
   const [clientState, setClientState] = useState<ClientState>('login');
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [oauthSession, setOAuthSession] = useState<OAuthSession | null>(null);
   const [communication, setCommunication] = useState<CommunicationService | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -98,8 +99,62 @@ const GamingParlourApp: React.FC = () => {
     setClientState('session');
   };
 
+  const handleOAuthLoginSuccess = async (
+    oauthSessionData: OAuthSession,
+    durationMinutes: number,
+    amount: number
+  ) => {
+    // Store OAuth session
+    setOAuthSession(oauthSessionData);
+
+    // Create a virtual user ID for OAuth session
+    const userId = `oauth_${oauthSessionData.googleUserId}`;
+    const userName = oauthSessionData.googleName;
+
+    // Create payment record
+    const payment: Payment = {
+      id: `payment-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      sessionId: '', // Will be updated after session creation
+      userId,
+      userName,
+      clientId,
+      amount,
+      method: 'wallet', // In production, integrate with actual payment gateway
+      timestamp: new Date().toISOString(),
+      duration: durationMinutes,
+      description: `OAuth gaming session - ${durationMinutes} minutes`,
+    };
+
+    // Start session
+    const session = await sessionService.startSession(
+      userId,
+      userName,
+      clientId,
+      durationMinutes,
+      payment
+    );
+
+    // Notify master PC about OAuth login
+    communication?.send({
+      type: 'session_start',
+      clientId,
+      userId,
+      payload: {
+        session,
+        oauthLogin: true,
+        googleEmail: oauthSessionData.googleEmail,
+        googleName: oauthSessionData.googleName,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    setCurrentSession(session);
+    setClientState('session');
+  };
+
   const handleSessionEnd = () => {
     setCurrentSession(null);
+    setOAuthSession(null);
     setClientState('login');
     authService.logout();
   };
@@ -150,6 +205,7 @@ const GamingParlourApp: React.FC = () => {
             <ClientLogin
               clientId={clientId}
               onLoginSuccess={handleClientLoginSuccess}
+              onOAuthLoginSuccess={handleOAuthLoginSuccess}
             />
           )}
 
@@ -159,6 +215,7 @@ const GamingParlourApp: React.FC = () => {
               clientId={clientId}
               communication={communication}
               onSessionEnd={handleSessionEnd}
+              oauthSession={oauthSession}
             />
           )}
         </>

@@ -4,21 +4,24 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Session } from '../../gaming-types';
+import { Session, OAuthSession } from '../../gaming-types';
 import { sessionService } from '../../services/sessionService';
 import CommunicationService from '../../services/communicationService';
+import GamesPanel from './GamesPanel';
 
 interface Props {
   session: Session;
   clientId: string;
   communication: CommunicationService;
   onSessionEnd: () => void;
+  oauthSession?: OAuthSession | null;
 }
 
-const ClientSession: React.FC<Props> = ({ session, clientId, communication, onSessionEnd }) => {
+const ClientSession: React.FC<Props> = ({ session, clientId, communication, onSessionEnd, oauthSession }) => {
   const [remainingTime, setRemainingTime] = useState(session.remainingTime);
   const [showWarning, setShowWarning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showTimerOverlay, setShowTimerOverlay] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const warningShownRef = useRef(false);
 
@@ -149,6 +152,102 @@ const ClientSession: React.FC<Props> = ({ session, clientId, communication, onSe
     return (remainingTime / session.plannedDuration) * 100;
   };
 
+  // If OAuth session, show games panel with floating timer
+  if (oauthSession) {
+    return (
+      <div className="relative min-h-screen">
+        {/* Games Panel */}
+        <GamesPanel session={session} clientId={clientId} communication={communication} />
+
+        {/* Floating Timer Widget */}
+        <div className="fixed top-4 right-4 z-50">
+          <div className="bg-black/80 backdrop-blur-md rounded-2xl p-4 border border-white/30 shadow-2xl min-w-[200px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-300 uppercase font-semibold">Time Left</span>
+              <button
+                onClick={() => setShowTimerOverlay(!showTimerOverlay)}
+                className="text-white hover:text-blue-400 transition"
+              >
+                {showTimerOverlay ? '−' : '+'}
+              </button>
+            </div>
+            <div className={`text-3xl font-bold ${getTimerColor()}`}>
+              {sessionService.formatTime(remainingTime)}
+            </div>
+
+            {showTimerOverlay && (
+              <div className="mt-4 pt-4 border-t border-white/20 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <img
+                    src={oauthSession.googlePicture}
+                    alt={oauthSession.googleName}
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <span className="text-white truncate">{oauthSession.googleName}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePause}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-semibold transition ${
+                      isPaused
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : 'bg-yellow-600 hover:bg-yellow-700'
+                    }`}
+                  >
+                    {isPaused ? '▶️' : '⏸️'}
+                  </button>
+                  <button
+                    onClick={handleEndSession}
+                    className="flex-1 px-3 py-2 text-xs bg-red-600 hover:bg-red-700 rounded-lg font-semibold transition"
+                  >
+                    ⏹️ End
+                  </button>
+                </div>
+                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      remainingTime <= 5
+                        ? 'bg-red-500'
+                        : remainingTime <= 15
+                        ? 'bg-yellow-500'
+                        : 'bg-green-500'
+                    }`}
+                    style={{ width: `${getProgressPercentage()}%` }}
+                  />
+                </div>
+                {isPaused && (
+                  <div className="bg-yellow-500/20 border border-yellow-500 rounded p-2">
+                    <p className="text-yellow-200 text-xs font-semibold">⏸️ Paused</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Warning Modal */}
+        {showWarning && (
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 animate-pulse">
+            <div className="bg-red-600 rounded-2xl p-8 max-w-md w-full text-center border-4 border-white">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-3xl font-bold mb-4 text-white">Time Warning!</h2>
+              <p className="text-xl mb-6 text-white">
+                Only <span className="font-bold">5 minutes</span> remaining in your session!
+              </p>
+              <button
+                onClick={() => setShowWarning(false)}
+                className="px-8 py-3 bg-white text-red-600 font-bold rounded-lg hover:bg-gray-100 transition"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Regular session view (non-OAuth)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white flex flex-col">
       {/* Header */}
